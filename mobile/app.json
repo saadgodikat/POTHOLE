@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "RoadWatch",
+    "slug": "roadwatch",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "RoadWatch needs camera access to capture road defect images.",
+        "NSLocationWhenInUseUsageDescription": "RoadWatch needs location access to tag defect reports with GPS coordinates."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0A0E1A"
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        { "cameraPermission": "Allow RoadWatch to access your camera." }
+      ],
+      [
+        "expo-location",
+        { "locationAlwaysAndWhenInUsePermission": "Allow RoadWatch to use your location." }
+      ]
+    ]
+  }
+}

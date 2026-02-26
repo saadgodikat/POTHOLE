@@ -1,5 +1,5 @@
 """
-RoadWatch AI — Kaggle Pothole Dataset Fine-Tuning Script
+StreetIntel AI — Kaggle Pothole Dataset Fine-Tuning Script
 =========================================================
 Downloads a pothole detection dataset from Kaggle and fine-tunes
 the YOLOv8 model on it to improve accuracy.
@@ -251,7 +251,7 @@ def build_dataset_yaml(extract_dir: Path) -> Path:
         train_imgs = extract_dir
         val_imgs   = extract_dir
 
-    yaml_content = f"""# RoadWatch Pothole Detection Dataset
+    yaml_content = f"""# StreetIntel Pothole Detection Dataset
 path: {extract_dir.as_posix()}
 train: {train_imgs.as_posix()}
 val:   {val_imgs.as_posix()}
@@ -306,7 +306,7 @@ def run_training(resume: bool = False, epochs: int = None, batch: int = None):
     base_model = get_base_model()
 
     print(f"\n{'='*60}")
-    print(f"  RoadWatch — Pothole Detection Fine-Tuning")
+    print(f"  StreetIntel — Pothole Detection Fine-Tuning")
     print(f"{'='*60}")
     print(f"  Base model : {base_model}")
     print(f"  Data YAML  : {YAML_PATH}")

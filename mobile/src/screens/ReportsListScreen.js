@@ -28,14 +28,14 @@ const bar = StyleSheet.create({
 });
 
 // ── Report card ───────────────────────────────────────────────────────────────
-function ReportCard({ item }) {
+function ReportCard({ item, onPress }) {
   const cfg  = STATUS_COLORS[item.status] || STATUS_COLORS.red;
   const date = new Date(item.created_at || item.timestamp);
   const conf = parseFloat(item.ai_confidence) || 0;
 
   return (
-    <View style={[card.container, { borderLeftColor: cfg.bar }]}>
-
+    <TouchableOpacity style={[card.container, { borderLeftColor: cfg.bar }]} onPress={onPress} activeOpacity={0.7}>
+ 
       {/* Header row */}
       <View style={card.header}>
         <Text style={card.id}>Report #{item.report_id}</Text>
@@ -43,12 +43,12 @@ function ReportCard({ item }) {
           <Text style={[card.badgeText, { color: cfg.text }]}>{cfg.label}</Text>
         </View>
       </View>
-
+ 
       {/* Date/time */}
       <Text style={card.date}>
         {date.toLocaleDateString()} · {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </Text>
-
+ 
       {/* GPS */}
       <View style={card.row}>
         <Feather name="map-pin" size={11} color={COLORS.primary} />
@@ -56,10 +56,10 @@ function ReportCard({ item }) {
           {parseFloat(item.latitude).toFixed(5)},  {parseFloat(item.longitude).toFixed(5)}
         </Text>
       </View>
-
+ 
       {/* Divider */}
       <View style={card.divider} />
-
+ 
       {/* AI result */}
       {item.defect_type ? (
         <View>
@@ -83,12 +83,12 @@ function ReportCard({ item }) {
           <Text style={card.pendingText}>AI analysis pending…</Text>
         </View>
       )}
-
+ 
       {/* Description */}
       {item.description ? (
         <Text style={card.desc} numberOfLines={2}>{item.description}</Text>
       ) : null}
-    </View>
+    </TouchableOpacity>
   );
 }
 const card = StyleSheet.create({
@@ -143,7 +143,7 @@ export default function ReportsListScreen({ navigation }) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Filter chips */}
       <View style={styles.filtersRow}>
@@ -183,7 +183,12 @@ export default function ReportsListScreen({ navigation }) {
         <FlatList
           data={reports}
           keyExtractor={(r) => String(r.report_id)}
-          renderItem={({ item }) => <ReportCard item={item} />}
+          renderItem={({ item }) => (
+            <ReportCard 
+              item={item} 
+              onPress={() => navigation.navigate('ReportDetail', { reportId: item.report_id })} 
+            />
+          )}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={COLORS.primary} />}
           ListHeaderComponent={

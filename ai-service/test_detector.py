@@ -1,5 +1,5 @@
 """
-RoadWatch AI — Pothole Detection Test Script
+StreetIntel AI — Pothole Detection Test Script
 =============================================
 Tests the pothole detection model on sample images.
 
@@ -66,7 +66,7 @@ def test_image(image_path: str):
 
 
 def main():
-    print_header("RoadWatch AI — Pothole Detection Test")
+    print_header("StreetIntel AI — Pothole Detection Test")
 
     # Show model info
     info = model_info()

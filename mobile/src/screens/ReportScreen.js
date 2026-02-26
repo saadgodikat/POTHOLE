@@ -10,7 +10,9 @@ import { getAddressFromCoords } from '../services/locationService';
 import { COLORS, FONTS, SPACING, RADIUS, SHADOWS } from '../theme';
 
 export default function ReportScreen({ route, navigation }) {
-  const { imageUri, latitude: gpsLat, longitude: gpsLng } = route.params;
+  const { imageUri, latitude: gpsLat, longitude: gpsLng, accuracy: gpsAccuracy } = route.params;
+  // Phase 1: capture client-side timestamp at the moment this screen mounts
+  const [capturedAt] = useState(() => new Date().toISOString());
 
   const [description,  setDescription]  = useState('');
   const [submitting,   setSubmitting]   = useState(false);
@@ -63,6 +65,9 @@ export default function ReportScreen({ route, navigation }) {
         latitude:    selLat,
         longitude:   selLng,
         description,
+        // Phase 1: send GPS precision & client-side timestamp
+        gpsAccuracy: gpsAccuracy ?? null,
+        capturedAt,
       });
       navigation.replace('Result', { report: result.report });
     } catch (err) {
@@ -154,6 +159,13 @@ export default function ReportScreen({ route, navigation }) {
                 <View style={[styles.sourceTag, styles.sourceTagMap]}>
                   <Feather name="map" size={10} color={COLORS.primary} />
                   <Text style={[styles.sourceTagText, { color: COLORS.primary }]}>Map selected</Text>
+                </View>
+              )}
+              {/* Phase 1: GPS accuracy badge */}
+              {gpsAccuracy != null && (
+                <View style={[styles.sourceTag, { marginLeft: 6, backgroundColor: 'rgba(251,191,36,0.10)', borderColor: 'rgba(251,191,36,0.30)' }]}>
+                  <Feather name="radio" size={10} color="#FBBF24" />
+                  <Text style={[styles.sourceTagText, { color: '#FBBF24' }]}>±{Math.round(gpsAccuracy)}m</Text>
                 </View>
               )}
             </View>

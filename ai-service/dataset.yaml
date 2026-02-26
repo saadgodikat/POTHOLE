@@ -1,4 +1,4 @@
-# RoadWatch Pothole Detection Dataset
+# StreetIntel Pothole Detection Dataset
 path: c:/Users/Saad Godikat/Downloads/hack/ai-service/training_data/yolo_dataset
 train: images/train
 val: images/val

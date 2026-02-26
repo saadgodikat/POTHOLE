@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const reportRoutes = require('./routes/reportRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const { getDb } = require('./db');
 
 const app = express();
@@ -30,6 +31,7 @@ getDb();
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/report', reportRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

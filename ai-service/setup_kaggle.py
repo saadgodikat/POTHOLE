@@ -19,7 +19,7 @@ KAGGLE_JSON = KAGGLE_DIR / "kaggle.json"
 
 def main():
     print("\n" + "=" * 60)
-    print("  RoadWatch — Kaggle API Setup")
+    print("  StreetIntel — Kaggle API Setup")
     print("=" * 60)
 
     if KAGGLE_JSON.exists():

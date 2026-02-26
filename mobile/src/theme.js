@@ -1,39 +1,39 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Design Tokens — Premium dark theme for RoadWatch
+// Design Tokens — Clean light theme for StreetIntel
 // ─────────────────────────────────────────────────────────────────────────────
 export const COLORS = {
   // Backgrounds
-  bg:           '#030712',
-  bgCard:       '#111827',
-  surface:      '#1F2937',
-  surfaceHigh:  '#374151',
+  bg:           '#F8FAFC',
+  bgCard:       '#FFFFFF',
+  surface:      '#F1F5F9',
+  surfaceHigh:  '#E2E8F0',
   // Brand
-  primary:      '#8B5CF6',
-  primaryLight: '#A78BFA',
+  primary:      '#7C3AED',
+  primaryLight: '#8B5CF6',
   primaryDark:  '#6D28D9',
-  primaryGlow:  'rgba(139,92,246,0.18)',
+  primaryGlow:  'rgba(124,58,237,0.10)',
   // Status
-  success:      '#10B981',
-  successGlow:  'rgba(16,185,129,0.15)',
-  warning:      '#F59E0B',
-  warningGlow:  'rgba(245,158,11,0.15)',
-  danger:       '#EF4444',
-  dangerGlow:   'rgba(239,68,68,0.15)',
+  success:      '#059669',
+  successGlow:  'rgba(5,150,105,0.10)',
+  warning:      '#D97706',
+  warningGlow:  'rgba(217,119,6,0.10)',
+  danger:       '#DC2626',
+  dangerGlow:   'rgba(220,38,38,0.10)',
   // Text
-  text:         '#F9FAFB',
-  textSub:      '#D1D5DB',
-  textMuted:    '#6B7280',
+  text:         '#0F172A',
+  textSub:      '#475569',
+  textMuted:    '#94A3B8',
   // Borders
-  border:       '#1F2937',
-  borderLight:  '#374151',
+  border:       '#E2E8F0',
+  borderLight:  '#CBD5E1',
   // Misc
-  overlay:      'rgba(3,7,18,0.85)',
+  overlay:      'rgba(15,23,42,0.6)',
 };
 
 export const STATUS_COLORS = {
-  red:    { bg: 'rgba(239,68,68,0.12)', text: '#EF4444',  border: 'rgba(239,68,68,0.3)',  label: 'Unassigned', bar: '#EF4444'  },
-  orange: { bg: 'rgba(245,158,11,0.12)',  text: '#F59E0B',  border: 'rgba(245,158,11,0.3)',   label: 'Assigned',   bar: '#F59E0B'  },
-  green:  { bg: 'rgba(16,185,129,0.12)',  text: '#10B981',  border: 'rgba(16,185,129,0.3)',   label: 'Completed',  bar: '#10B981'  },
+  red:    { bg: 'rgba(220,38,38,0.08)',  text: '#DC2626', border: 'rgba(220,38,38,0.25)',  label: 'Unassigned', bar: '#DC2626' },
+  orange: { bg: 'rgba(217,119,6,0.08)',  text: '#D97706', border: 'rgba(217,119,6,0.25)',  label: 'Assigned',   bar: '#D97706' },
+  green:  { bg: 'rgba(5,150,105,0.08)',  text: '#059669', border: 'rgba(5,150,105,0.25)',  label: 'Completed',  bar: '#059669' },
 };
 
 export const FONTS = {
@@ -66,17 +66,17 @@ export const RADIUS = {
 
 export const SHADOWS = {
   primary: {
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  card: {
-    shadowColor: '#000',
+    shadowColor: '#7C3AED',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.22,
     shadowRadius: 12,
     elevation: 6,
+  },
+  card: {
+    shadowColor: '#94A3B8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
   },
 };

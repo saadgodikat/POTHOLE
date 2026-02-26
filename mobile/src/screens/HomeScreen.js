@@ -14,7 +14,7 @@ const { width } = Dimensions.get('window');
 export default function HomeScreen({ navigation }) {
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.bg} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
 
         {/* ── Hero ── */}
@@ -25,7 +25,7 @@ export default function HomeScreen({ navigation }) {
               <Image source={require('../../assets/logo.png')} style={styles.logoImage} />
             </View>
           </View>
-          <Text style={styles.appName}>RoadWatch</Text>
+          <Text style={styles.appName}>StreetIntel</Text>
           <Text style={styles.tagline}>AI-Powered Road Inspection Platform</Text>
 
           {/* Pill tag */}
@@ -117,14 +117,14 @@ const styles = StyleSheet.create({
   hero: { alignItems: 'center', marginBottom: SPACING.xl },
   glowOuter: {
     width: 110, height: 110, borderRadius: 55,
-    backgroundColor: 'rgba(139,92,246,0.08)',
+    backgroundColor: 'rgba(124,58,237,0.06)',
     alignItems: 'center', justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   glowInner: {
     width: 80, height: 80, borderRadius: 24,
-    backgroundColor: 'rgba(139,92,246,0.14)',
-    borderWidth: 1, borderColor: 'rgba(139,92,246,0.35)',
+    backgroundColor: 'rgba(124,58,237,0.10)',
+    borderWidth: 1.5, borderColor: 'rgba(124,58,237,0.25)',
     alignItems: 'center', justifyContent: 'center',
   },
   logoImage: { width: 44, height: 44, resizeMode: 'contain' },
@@ -132,13 +132,13 @@ const styles = StyleSheet.create({
   tagline: { fontSize: FONTS.sm, color: COLORS.textMuted, marginTop: 6, textAlign: 'center' },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(139,92,246,0.10)',
-    borderWidth: 1, borderColor: 'rgba(139,92,246,0.25)',
+    backgroundColor: 'rgba(124,58,237,0.08)',
+    borderWidth: 1, borderColor: 'rgba(124,58,237,0.2)',
     borderRadius: RADIUS.full, paddingHorizontal: 14, paddingVertical: 5,
     marginTop: SPACING.md,
   },
   pillDot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.success },
-  pillText: { fontSize: FONTS.xs, color: COLORS.primaryLight, fontWeight: '600' },
+  pillText: { fontSize: FONTS.xs, color: COLORS.primary, fontWeight: '600' },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: SPACING.sm, marginBottom: SPACING.lg },

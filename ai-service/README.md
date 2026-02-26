@@ -1,4 +1,4 @@
-# 🕳️ RoadWatch AI — Pothole Detection Service
+# 🕳️ StreetIntel AI — Pothole Detection Service
 
 YOLOv8-powered pothole detection with **3-level danger classification**.
 
@@ -58,7 +58,7 @@ python test_detector.py
 Runs the model on all images in `test_images/` and prints results:
 ```
 ══════════════════════════════════════════════════════════════════════
-  RoadWatch AI — Pothole Detection Test
+  StreetIntel AI — Pothole Detection Test
 ══════════════════════════════════════════════════════════════════════
 
   Model:        keremberke/yolov8n-pothole-detection

@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="RoadWatch AI — Pothole Detection Service",
+    title="StreetIntel AI — Pothole Detection Service",
     description=(
         "YOLOv8 pothole detection with **3-level danger classification**.\n\n"
         "Danger levels (prioritised most dangerous first):\n"

@@ -4,322 +4,357 @@ RoadWatch AI — Kaggle Pothole Dataset Fine-Tuning Script
 Downloads a pothole detection dataset from Kaggle and fine-tunes
 the YOLOv8 model on it to improve accuracy.
 
+Uses the Kaggle HTTP API directly — no kaggle Python package needed.
+
 Prerequisites:
-    1. pip install kaggle ultralytics huggingface_hub
-    2. Get your Kaggle API key from: https://www.kaggle.com/settings → API → Create New Token
-       This downloads a kaggle.json file. Place it at:
-         Windows: C:\\Users\\YourName\\.kaggle\\kaggle.json
-         Linux/Mac: ~/.kaggle/kaggle.json
+    pip install ultralytics huggingface_hub requests tqdm
+
+Setup — ONE of the following:
+    Option A (Recommended): Set env var before running:
+        Windows CMD:   set KAGGLE_API_TOKEN=KGAT_xxxx
+        PowerShell:    $env:KAGGLE_API_TOKEN="KGAT_xxxx"
+
+    Option B: Pass token on command line:
+        python train.py --token KGAT_xxxx
+
+    Option C: Place kaggle.json at C:\\Users\\Name\\.kaggle\\kaggle.json
+        Format for new tokens:  {"token":"KGAT_xxxx"}
+        Format for old tokens:  {"username":"x","key":"x"}
 
 Usage:
-    cd ai-service
-    python train.py
-
-    # Or with explicit API key:
-    python train.py --kaggle-username YOUR_USERNAME --kaggle-key YOUR_KEY
-
-    # Resume from a previous training run:
-    python train.py --resume
-
-After training completes:
-    - Best weights saved to: models/pothole_finetuned.pt
-    - The detector.py will automatically use this model on next startup
+    python train.py --token KGAT_2e026db6c33f419807a91ce4bfb8a3e7
+    python train.py --epochs 20 --batch 4          # CPU-optimized
+    python train.py --skip-download --resume        # Resume training
 """
 
 import argparse
+import json
 import os
-import sys
 import shutil
+import sys
 import zipfile
-import glob
 from pathlib import Path
 
-
 # ── Paths ─────────────────────────────────────────────────────────────────────
-BASE_DIR    = Path(__file__).parent
-MODELS_DIR  = BASE_DIR / "models"
-DATA_DIR    = BASE_DIR / "training_data"
-DATASET_ZIP = DATA_DIR / "dataset.zip"
-YAML_PATH   = BASE_DIR / "dataset.yaml"
+BASE_DIR     = Path(__file__).parent
+MODELS_DIR   = BASE_DIR / "models"
+DATA_DIR     = BASE_DIR / "training_data"
+YAML_PATH    = BASE_DIR / "dataset.yaml"
 OUTPUT_MODEL = MODELS_DIR / "pothole_finetuned.pt"
 
-# ── Kaggle dataset (YOLO-annotated, 3940 images, pre-split) ──────────────────
-KAGGLE_DATASET = "farzadnekouei/pothole-image-based-detection-dataset"
-KAGGLE_DATASET_ALT = "sovitrath/road-pothole-images-for-pothole-detection"
-# We will try the primary then fall back to a second option
+# ── Kaggle datasets to try (YOLO-annotated, pre-split train/val/test) ─────────
+# These are public datasets with bounding-box annotations in YOLO format.
+KAGGLE_DATASETS = [
+    ("farzadnekouei", "pothole-image-based-detection-dataset"),
+    ("sovitrath",     "road-pothole-images-for-pothole-detection"),
+    ("chitholian",    "annotated-potholes-dataset"),
+]
 
-# ── Training config ───────────────────────────────────────────────────────────
-TRAIN_EPOCHS     = int(os.getenv("TRAIN_EPOCHS", "50"))
-TRAIN_IMG_SIZE   = int(os.getenv("TRAIN_IMG_SIZE", "640"))
-TRAIN_BATCH      = int(os.getenv("TRAIN_BATCH", "8"))      # 8 for CPU, 16 for GPU
-TRAIN_WORKERS    = int(os.getenv("TRAIN_WORKERS", "2"))    # Keep low on Windows
-BASE_MODEL       = os.getenv("BASE_MODEL", "")             # Empty = auto-detect from HF
+# ── Training config ──────────────────────────────────────────────────────────
+TRAIN_EPOCHS   = int(os.getenv("TRAIN_EPOCHS",   "20"))   # 20 = ~1-2 hrs CPU
+TRAIN_IMG_SIZE = int(os.getenv("TRAIN_IMG_SIZE", "640"))
+TRAIN_BATCH    = int(os.getenv("TRAIN_BATCH",    "4"))     # 4 for CPU
+TRAIN_WORKERS  = int(os.getenv("TRAIN_WORKERS",  "0"))     # 0 = no multiprocessing (Windows)
 
 
-def setup_kaggle_auth(username: str = None, key: str = None):
-    """Configure Kaggle API credentials."""
-    if username and key:
-        os.environ["KAGGLE_USERNAME"] = username
-        os.environ["KAGGLE_KEY"] = key
-        print(f"[Train] Using provided Kaggle credentials for: {username}")
-        return
+# ────────────────────────────────────── DOWNLOAD ──────────────────────────────
 
-    # Check environment variables
-    if os.getenv("KAGGLE_USERNAME") and os.getenv("KAGGLE_KEY"):
-        print(f"[Train] Using Kaggle credentials from environment")
-        return
+def _get_token(cli_token: str = None) -> str:
+    """Resolve Kaggle API token with fallback chain."""
+    # 1. CLI arg
+    if cli_token:
+        return cli_token
 
-    # Check kaggle.json
+    # 2. Environment variable
+    token = os.getenv("KAGGLE_API_TOKEN") or os.getenv("KAGGLE_KEY")
+    if token:
+        return token
+
+    # 3. kaggle.json
     kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
     if kaggle_json.exists():
-        print(f"[Train] Using Kaggle credentials from {kaggle_json}")
-        return
+        try:
+            creds = json.loads(kaggle_json.read_text(encoding="utf-8"))
+            # New token format: {"token":"KGAT_xxxx"}
+            if "token" in creds:
+                return creds["token"]
+            # Old format: {"username":"xx","key":"xx"} → reconstruct as Basic auth handled separately
+            if "key" in creds:
+                return creds.get("key", "")
+        except Exception:
+            pass
 
-    print("\n" + "=" * 60)
-    print("ERROR: Kaggle credentials not found!")
-    print("=" * 60)
-    print("\nTo set up Kaggle API access:")
-    print("  1. Go to https://www.kaggle.com/settings → API")
-    print("  2. Click 'Create New Token' — downloads kaggle.json")
-    print(f"  3. Place kaggle.json in: {kaggle_json.parent}")
-    print("\nOr pass credentials directly:")
-    print("  python train.py --kaggle-username YOUR_USERNAME --kaggle-key YOUR_KEY")
-    print("=" * 60 + "\n")
+    return ""
+
+
+def _kaggle_download(token: str, owner: str, dataset: str, dest_dir: Path) -> Path:
+    """
+    Download a Kaggle dataset as a zip file using the HTTP API.
+    Returns the path to the downloaded zip.
+    """
+    import requests
+    from requests.auth import HTTPBasicAuth
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = dest_dir / f"{dataset}.zip"
+
+    if zip_path.exists():
+        print(f"[Train] Found cached download: {zip_path}")
+        return zip_path
+
+    # Kaggle dataset download URL (v1 API)
+    url = f"https://www.kaggle.com/api/v1/datasets/download/{owner}/{dataset}"
+
+    print(f"[Train] Downloading: {owner}/{dataset}")
+    print(f"[Train] From: {url}")
+
+    # Try the new KGAT token as Bearer auth first, then Basic auth as fallback
+    session = requests.Session()
+    session.headers["Accept"] = "application/zip"
+
+    if token.startswith("KGAT_"):
+        # New OAuth bearer token
+        session.headers["Authorization"] = f"Bearer {token}"
+        auth = None
+    else:
+        # Legacy: use as the API key with username from kaggle.json
+        kaggle_json = Path.home() / ".kaggle" / "kaggle.json"
+        username = ""
+        if kaggle_json.exists():
+            try:
+                creds = json.loads(kaggle_json.read_text(encoding="utf-8"))
+                username = creds.get("username", "")
+            except Exception:
+                pass
+        auth = HTTPBasicAuth(username, token)
+
+    # Stream download with progress
+    try:
+        resp = session.get(url, auth=auth, stream=True, timeout=120)
+    except Exception as e:
+        raise RuntimeError(f"Network error: {e}")
+
+    if resp.status_code == 401:
+        raise RuntimeError("Auth failed (401) — check your KAGGLE_API_TOKEN")
+    if resp.status_code == 403:
+        raise RuntimeError("Access denied (403) — you may need to accept dataset rules on Kaggle")
+    if resp.status_code == 404:
+        raise RuntimeError(f"Dataset not found (404): {owner}/{dataset}")
+    if resp.status_code != 200:
+        raise RuntimeError(f"Download failed ({resp.status_code}): {resp.text[:200]}")
+
+    # Save to disk with tqdm progress bar
+    try:
+        from tqdm import tqdm
+        total = int(resp.headers.get("content-length", 0))
+        with open(zip_path, "wb") as f, tqdm(total=total, unit="B", unit_scale=True, desc=dataset) as pbar:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+                pbar.update(len(chunk))
+    except ImportError:
+        print("[Train] (Install tqdm for a progress bar — pip install tqdm)")
+        with open(zip_path, "wb") as f:
+            for chunk in resp.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+    size_mb = zip_path.stat().st_size / 1_048_576
+    print(f"[Train] ✅ Downloaded {size_mb:.1f} MB → {zip_path}")
+    return zip_path
+
+
+def download_dataset(token: str) -> Path:
+    """Try each Kaggle dataset in turn until one downloads successfully."""
+    for owner, dataset in KAGGLE_DATASETS:
+        try:
+            return _kaggle_download(token, owner, dataset, DATA_DIR)
+        except RuntimeError as e:
+            print(f"[Train] ⚠ {owner}/{dataset} failed: {e}")
+
+    print("\n[Train] ❌ All dataset downloads failed.")
+    print("         Check your KAGGLE_API_TOKEN and internet connection.")
     sys.exit(1)
 
 
-def download_dataset():
-    """Download pothole dataset from Kaggle."""
-    print(f"\n[Train] Downloading pothole dataset from Kaggle...")
-    print(f"[Train] Dataset: {KAGGLE_DATASET}")
+# ────────────────────────────────────── PREPARE ───────────────────────────────
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-    try:
-        import kaggle
-        kaggle.api.authenticate()
-        kaggle.api.dataset_download_files(
-            KAGGLE_DATASET,
-            path=str(DATA_DIR),
-            unzip=False
-        )
-        print(f"[Train] ✅ Dataset downloaded to {DATA_DIR}")
-    except Exception as e:
-        print(f"[Train] ⚠ Primary dataset failed: {e}")
-        print(f"[Train] Trying alternative dataset: {KAGGLE_DATASET_ALT}")
-        try:
-            import kaggle
-            kaggle.api.dataset_download_files(
-                KAGGLE_DATASET_ALT,
-                path=str(DATA_DIR),
-                unzip=False
-            )
-            print(f"[Train] ✅ Alternative dataset downloaded")
-        except Exception as e2:
-            print(f"[Train] ❌ Both datasets failed. Error: {e2}")
-            sys.exit(1)
-
-
-def extract_and_prepare():
-    """Extract the downloaded dataset and prepare directory structure for YOLO."""
-    print(f"\n[Train] Extracting dataset...")
-
-    # Find the zip file
-    zips = list(DATA_DIR.glob("*.zip"))
-    if not zips:
-        print(f"[Train] ❌ No zip file found in {DATA_DIR}")
-        sys.exit(1)
-
-    zip_path = zips[0]
+def extract_dataset(zip_path: Path) -> Path:
+    """Extract zip and return the extracted folder."""
     extract_dir = DATA_DIR / "extracted"
+    if extract_dir.exists() and any(extract_dir.iterdir()):
+        print(f"[Train] Using existing extracted data: {extract_dir}")
+        return extract_dir
+
     extract_dir.mkdir(exist_ok=True)
-
-    with zipfile.ZipFile(zip_path, 'r') as z:
+    print(f"[Train] Extracting {zip_path.name}...")
+    with zipfile.ZipFile(zip_path, "r") as z:
         z.extractall(extract_dir)
-    print(f"[Train] ✅ Extracted to: {extract_dir}")
-    print(f"[Train] Contents: {list(extract_dir.iterdir())}")
-
+    contents = list(extract_dir.iterdir())
+    print(f"[Train] Extracted {len(contents)} items → {extract_dir}")
     return extract_dir
 
 
-def find_yolo_structure(root: Path):
-    """
-    Search for YOLO dataset structure (train/val/test folders with images + labels).
-    Returns (train_path, val_path, test_path).
-    """
-    # Common YOLO dataset layouts
-    possible_train = [
-        root / "train",
-        root / "images" / "train",
-    ]
-    for sub in root.iterdir():
-        if sub.is_dir():
-            possible_train.append(sub / "train")
-            possible_train.append(sub / "images" / "train")
-
-    train_path = None
-    for p in possible_train:
-        if p.exists() and any(p.glob("*.jpg")) or any(p.glob("*.png")):
-            train_path = p.parent
-            break
-        # Also check if the images are directly in the train folder
-        if p.exists():
-            imgs = list(p.glob("*.jpg")) + list(p.glob("*.png")) + list(p.glob("*.jpeg"))
-            if imgs:
-                train_path = p.parent
-                break
-
-    if train_path is None:
-        # Try to find any images directory
-        img_dirs = list(root.rglob("train"))
-        if img_dirs:
-            train_path = img_dirs[0].parent
-
-    return train_path
+def _find_images(root: Path) -> list:
+    """Return list of all image paths under root."""
+    exts = {".jpg", ".jpeg", ".png"}
+    return [p for p in root.rglob("*") if p.suffix.lower() in exts]
 
 
-def create_dataset_yaml(dataset_root: Path):
-    """Create the YOLO dataset.yaml configuration file."""
-    # Try to find the yaml file in the extracted dataset
-    existing_yamls = list(dataset_root.rglob("*.yaml"))
-    if existing_yamls:
-        yaml_src = existing_yamls[0]
-        print(f"[Train] Found existing YAML: {yaml_src}")
-        shutil.copy(yaml_src, YAML_PATH)
-        # Update the paths in the yaml to be absolute
-        content = YAML_PATH.read_text()
-        # Fix relative paths if needed
-        if "path:" in content:
-            print(f"[Train] Using dataset YAML as-is")
-        else:
-            # Re-write with correct paths
-            _write_yaml(dataset_root)
-    else:
-        _write_yaml(dataset_root)
+def build_dataset_yaml(extract_dir: Path) -> Path:
+    """Find/create dataset.yaml for YOLO training."""
+    if YAML_PATH.exists():
+        print(f"[Train] Using existing: {YAML_PATH}")
+        return YAML_PATH
 
-    print(f"[Train] ✅ Dataset YAML: {YAML_PATH}")
+    # Try to use the dataset's own YAML
+    yamls = list(extract_dir.rglob("*.yaml")) + list(extract_dir.rglob("*.yml"))
+    yamls = [y for y in yamls if "data" in y.name.lower() or "dataset" in y.name.lower() or y.parent.name in ("", ".")]
+    if not yamls:
+        yamls = list(extract_dir.rglob("*.yaml"))
 
+    if yamls:
+        src_yaml = yamls[0]
+        print(f"[Train] Found dataset YAML: {src_yaml}")
+        # Read and fix paths to be absolute
+        content = src_yaml.read_text(encoding="utf-8")
+        # If it has a 'path:' line, update it to our extracted dir
+        lines = content.splitlines()
+        new_lines = []
+        has_path_line = any(l.strip().startswith("path:") for l in lines)
+        for line in lines:
+            if line.strip().startswith("path:"):
+                new_lines.append(f"path: {extract_dir.as_posix()}")
+            else:
+                new_lines.append(line)
+        if not has_path_line:
+            new_lines = [f"path: {extract_dir.as_posix()}"] + new_lines
+        YAML_PATH.write_text("\n".join(new_lines), encoding="utf-8")
+        print(f"[Train] ✅ Dataset YAML saved: {YAML_PATH}")
+        return YAML_PATH
 
-def _write_yaml(dataset_root: Path):
-    """Write a YOLO dataset.yaml from scratch."""
-    train_dir = dataset_root / "train" / "images"
-    val_dir   = dataset_root / "valid" / "images"
-    test_dir  = dataset_root / "test"  / "images"
+    # Auto-detect train/val directories
+    train_imgs = next((p for p in [
+        extract_dir / "train" / "images",
+        extract_dir / "images" / "train",
+        extract_dir / "train",
+    ] if p.exists()), None)
 
-    if not train_dir.exists():
-        train_dir = dataset_root / "train"
-    if not val_dir.exists():
-        val_dir = dataset_root / "val"
-    if not val_dir.exists():
-        val_dir = train_dir  # fallback: use train as val
+    val_imgs = next((p for p in [
+        extract_dir / "valid" / "images",
+        extract_dir / "val" / "images",
+        extract_dir / "images" / "val",
+        extract_dir / "valid",
+        extract_dir / "val",
+    ] if p.exists()), train_imgs)  # fallback to train
+
+    if not train_imgs:
+        # use the whole extracted dir as training data
+        train_imgs = extract_dir
+        val_imgs   = extract_dir
 
     yaml_content = f"""# RoadWatch Pothole Detection Dataset
-path: {dataset_root.as_posix()}
-train: {train_dir.as_posix()}
-val:   {val_dir.as_posix()}
-{"test:  " + test_dir.as_posix() if test_dir.exists() else "# test: (not available)"}
+path: {extract_dir.as_posix()}
+train: {train_imgs.as_posix()}
+val:   {val_imgs.as_posix()}
 
 nc: 1
 names:
   0: pothole
 """
-    YAML_PATH.write_text(yaml_content)
+    YAML_PATH.write_text(yaml_content, encoding="utf-8")
+    print(f"[Train] ✅ Auto-generated dataset YAML: {YAML_PATH}")
+    return YAML_PATH
 
 
-def get_base_model():
-    """Get the base model path for fine-tuning. Prefers the HuggingFace pretrained model."""
-    # Check if we already have a locally trained model to continue from
+# ────────────────────────────────────── TRAIN ─────────────────────────────────
+
+def get_base_model() -> str:
+    """Return path to the best available base model for fine-tuning."""
+    # Already trained? Continue from it.
     if OUTPUT_MODEL.exists():
-        print(f"[Train] Found existing trained model — continuing fine-tuning: {OUTPUT_MODEL}")
+        print(f"[Train] Continuing from existing trained model: {OUTPUT_MODEL}")
         return str(OUTPUT_MODEL)
 
-    # Check for the HuggingFace pretrained model in cache
-    hf_cache_pattern = str(Path.home() / ".cache" / "huggingface" / "hub" / "models--Harisanth--Pothole-Finetuned-YOLOv8" / "**" / "best.pt")
-    hf_cached = glob.glob(hf_cache_pattern, recursive=True)
-    if hf_cached:
-        print(f"[Train] Found cached HuggingFace model: {hf_cached[0]}")
-        return hf_cached[0]
+    # HuggingFace cache
+    import glob as _glob
+    hf_pattern = str(Path.home() / ".cache" / "huggingface" / "hub" /
+                     "models--Harisanth--Pothole-Finetuned-YOLOv8" / "**" / "best.pt")
+    cached = _glob.glob(hf_pattern, recursive=True)
+    if cached:
+        print(f"[Train] Using cached HF model: {cached[0]}")
+        return cached[0]
 
     # Download from HuggingFace
-    print("[Train] Downloading base model from HuggingFace...")
+    print("[Train] Downloading base pothole model from HuggingFace (~22 MB)...")
     try:
         from huggingface_hub import hf_hub_download
         path = hf_hub_download(repo_id="Harisanth/Pothole-Finetuned-YOLOv8", filename="best.pt")
-        print(f"[Train] ✅ Downloaded base model: {path}")
+        print(f"[Train] ✅ Base model ready: {path}")
         return path
     except Exception as e:
-        print(f"[Train] ⚠ HuggingFace download failed: {e}")
-        print("[Train] Falling back to yolov8n.pt (COCO pretrained)")
+        print(f"[Train] ⚠ HF download failed ({e}) — using yolov8n.pt (COCO fallback)")
         return "yolov8n.pt"
 
 
-def train(resume=False):
-    """Run the YOLO fine-tuning."""
+def run_training(resume: bool = False, epochs: int = None, batch: int = None):
+    """Run YOLO fine-tuning."""
     from ultralytics import YOLO
+
+    _epochs = epochs or TRAIN_EPOCHS
+    _batch  = batch  or TRAIN_BATCH
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     base_model = get_base_model()
 
     print(f"\n{'='*60}")
-    print(f"  RoadWatch Pothole Detection — Fine-Tuning")
+    print(f"  RoadWatch — Pothole Detection Fine-Tuning")
     print(f"{'='*60}")
-    print(f"  Base model:   {base_model}")
-    print(f"  Dataset YAML: {YAML_PATH}")
-    print(f"  Epochs:       {TRAIN_EPOCHS}")
-    print(f"  Image size:   {TRAIN_IMG_SIZE}")
-    print(f"  Batch size:   {TRAIN_BATCH}")
-    print(f"  Output:       {OUTPUT_MODEL}")
+    print(f"  Base model : {base_model}")
+    print(f"  Data YAML  : {YAML_PATH}")
+    print(f"  Epochs     : {_epochs}  (early stop at patience=10)")
+    print(f"  Batch size : {_batch}")
+    print(f"  Device     : {'GPU' if _has_gpu() else 'CPU (slow but works)'}")
+    print(f"  Output     : {OUTPUT_MODEL}")
     print(f"{'='*60}\n")
 
-    model = YOLO(base_model)
-
+    model   = YOLO(base_model)
     results = model.train(
         data       = str(YAML_PATH),
-        epochs     = TRAIN_EPOCHS,
+        epochs     = _epochs,
         imgsz      = TRAIN_IMG_SIZE,
-        batch      = TRAIN_BATCH,
+        batch      = _batch,
         workers    = TRAIN_WORKERS,
         project    = str(MODELS_DIR / "runs"),
         name       = "pothole_finetune",
         exist_ok   = True,
         resume     = resume,
-        device     = "0" if _has_gpu() else "cpu",  # auto-detect GPU
-        # Augmentation (to reduce overfitting on small datasets)
-        hsv_h      = 0.015,   # HSV hue augmentation
-        hsv_s      = 0.7,     # HSV saturation
-        hsv_v      = 0.4,     # HSV value
-        flipud     = 0.1,     # vertical flip prob
-        fliplr     = 0.5,     # horizontal flip prob
-        mosaic     = 1.0,     # mosaic augmentation
-        mixup      = 0.1,     # mixup augmentation
-        copy_paste = 0.1,     # copy-paste augmentation
-        patience   = 15,      # early stopping - stop if no improvement for 15 epochs
+        device     = "0" if _has_gpu() else "cpu",
+        patience   = 10,
         save       = True,
         verbose    = True,
+        # Augmentation
+        hsv_h=0.015, hsv_s=0.7, hsv_v=0.4,
+        flipud=0.1,  fliplr=0.5,
+        mosaic=1.0,  mixup=0.05,
     )
 
-    # Copy best weights to our standard output path
     best_weights = MODELS_DIR / "runs" / "pothole_finetune" / "weights" / "best.pt"
     if best_weights.exists():
         shutil.copy(best_weights, OUTPUT_MODEL)
+        metrics = results.results_dict
+        map50   = metrics.get("metrics/mAP50(B)", 0)
         print(f"\n{'='*60}")
         print(f"  ✅ Training Complete!")
-        print(f"{'='*60}")
-        print(f"  Best mAP50:   {results.results_dict.get('metrics/mAP50(B)', 'N/A'):.4f}")
-        print(f"  Best mAP50-95:{results.results_dict.get('metrics/mAP50-95(B)', 'N/A'):.4f}")
-        print(f"  Model saved:  {OUTPUT_MODEL}")
-        print(f"\n  The AI service will automatically use this model on next restart.")
-        print(f"  Restart with: uvicorn main:app --host 0.0.0.0 --port 8000")
+        print(f"  mAP50  : {map50:.4f}")
+        print(f"  Saved  : {OUTPUT_MODEL}")
+        print(f"  Restart AI service to load the new model.")
         print(f"{'='*60}\n")
     else:
-        print(f"\n[Train] ⚠ best.pt not found at {best_weights}")
-        print(f"[Train] Check the runs directory: {MODELS_DIR / 'runs'}")
+        print(f"[Train] ⚠ Could not find best.pt at {best_weights}")
 
     return results
 
 
-def _has_gpu():
-    """Check if a CUDA GPU is available."""
+def _has_gpu() -> bool:
     try:
         import torch
         return torch.cuda.is_available()
@@ -327,42 +362,44 @@ def _has_gpu():
         return False
 
 
-def main():
-    # Read module-level defaults for argparse help text (avoids global-before-local error)
-    _default_epochs = int(os.getenv("TRAIN_EPOCHS", "50"))
-    _default_batch  = int(os.getenv("TRAIN_BATCH", "8"))
+# ────────────────────────────────────── MAIN ──────────────────────────────────
 
-    parser = argparse.ArgumentParser(description="Fine-tune YOLOv8 on Kaggle pothole dataset")
-    parser.add_argument("--kaggle-username", help="Kaggle username")
-    parser.add_argument("--kaggle-key",      help="Kaggle API key")
-    parser.add_argument("--skip-download",   action="store_true",
-                        help="Skip dataset download (use existing training_data/)")
-    parser.add_argument("--resume",          action="store_true",
-                        help="Resume from last training checkpoint")
-    parser.add_argument("--epochs",          type=int, default=_default_epochs,
-                        help=f"Number of training epochs (default: {_default_epochs})")
-    parser.add_argument("--batch",           type=int, default=_default_batch,
-                        help=f"Batch size (default: {_default_batch}; use 16 if GPU)")
+def main():
+    parser = argparse.ArgumentParser(
+        description="Fine-tune YOLOv8 on Kaggle pothole dataset",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python train.py --token KGAT_xxxxxxxxxxxx
+  python train.py --token KGAT_xxxx --epochs 20 --batch 4
+  python train.py --skip-download   (if already downloaded)
+  python train.py --resume          (continue interrupted training)
+        """
+    )
+    parser.add_argument("--token",         help="Kaggle API token (KGAT_xxxx)")
+    parser.add_argument("--skip-download", action="store_true", help="Skip download")
+    parser.add_argument("--resume",        action="store_true", help="Resume training")
+    parser.add_argument("--epochs",        type=int, default=TRAIN_EPOCHS)
+    parser.add_argument("--batch",         type=int, default=TRAIN_BATCH)
     args = parser.parse_args()
 
-    # Update module-level training config with CLI overrides
-    global TRAIN_EPOCHS, TRAIN_BATCH
-    TRAIN_EPOCHS = args.epochs
-    TRAIN_BATCH  = args.batch
-
     if not args.skip_download:
-        setup_kaggle_auth(args.kaggle_username, args.kaggle_key)
-        download_dataset()
-        extract_dir = extract_and_prepare()
-        dataset_root = find_yolo_structure(extract_dir) or extract_dir
-        create_dataset_yaml(dataset_root)
+        token = _get_token(args.token)
+        if not token:
+            print("\nERROR: No Kaggle API token found.")
+            print("Pass it with:  python train.py --token KGAT_xxxx")
+            sys.exit(1)
+
+        zip_path    = download_dataset(token)
+        extract_dir = extract_dataset(zip_path)
+        build_dataset_yaml(extract_dir)
     else:
         if not YAML_PATH.exists():
-            print(f"[Train] ❌ dataset.yaml not found. Run without --skip-download first.")
+            print("[Train] ❌ dataset.yaml missing. Run without --skip-download first.")
             sys.exit(1)
-        print(f"[Train] Skipping download, using existing: {YAML_PATH}")
+        print(f"[Train] Using existing dataset: {YAML_PATH}")
 
-    train(resume=args.resume)
+    run_training(resume=args.resume, epochs=args.epochs, batch=args.batch)
 
 
 if __name__ == "__main__":

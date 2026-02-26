@@ -1,0 +1,7 @@
+# RoadWatch Pothole Detection Dataset
+path: c:/Users/Saad Godikat/Downloads/hack/ai-service/training_data/yolo_dataset
+train: images/train
+val: images/val
+test: images/val
+nc: 1
+names: ['pothole']

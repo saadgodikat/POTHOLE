@@ -7,6 +7,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator }     from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen            from './src/screens/HomeScreen';
 import CaptureScreen         from './src/screens/CaptureScreen';
@@ -52,67 +53,71 @@ function MainStack() {
 // ── Root tabs ─────────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <NavigationContainer>
-      <StatusBar style="dark" />
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: COLORS.bgCard,
-            borderTopColor:  COLORS.border,
-            borderTopWidth:  1,
-            height: 64,
-            paddingBottom: 10,
-            paddingTop: 6,
-          },
-          tabBarActiveTintColor:   COLORS.primary,
-          tabBarInactiveTintColor: COLORS.textMuted,
-          tabBarLabelStyle: { fontSize: FONTS.xs, fontWeight: '600', marginTop: 2 },
-          tabBarIcon: ({ color, focused }) => {
-            if (route.name === 'Home')    return <Feather name="home" size={20} color={color} />;
-            if (route.name === 'Reports') return <Feather name="list" size={20} color={color} />;
-            if (route.name === 'About')   return <Feather name="info" size={20} color={color} />;
-            if (route.name === 'Heatmap') return (
-              <MaterialCommunityIcons
-                name={focused ? 'map-marker-radius' : 'map-marker-radius-outline'}
-                size={22}
-                color={color}
-              />
-            );
-          },
-        })}
-      >
-        <Tab.Screen name="Home"    component={MainStack}        options={{ title: 'Home' }} />
-        <Tab.Screen
-          name="Reports"
-          component={ReportsListScreen}
-          options={{
-            title: 'Reports',
-            headerShown: true,
-            ...BASE_HEADER,
-            headerTitle: 'Reports',
-          }}
-        />
-        {/* Phase 4: Heatmap tab */}
-        <Tab.Screen
-          name="Heatmap"
-          component={HeatmapScreen}
-          options={{
-            title: 'Heatmap',
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <Tab.Navigator
+          screenOptions={({ route }) => ({
             headerShown: false,
-          }}
-        />
-        <Tab.Screen
-          name="About"
-          component={AboutScreen}
-          options={{
-            title: 'About',
-            headerShown: true,
-            ...BASE_HEADER,
-            headerTitle: 'About & How to Use',
-          }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+            tabBarStyle: {
+              backgroundColor: COLORS.bgCard,
+              borderTopColor:  COLORS.border,
+              borderTopWidth:  1,
+              height: 64,
+              paddingBottom: 10,
+              paddingTop: 6,
+            },
+            tabBarActiveTintColor:   COLORS.primary,
+            tabBarInactiveTintColor: COLORS.textMuted,
+            tabBarLabelStyle: { fontSize: FONTS.xs, fontWeight: '600', marginTop: 2 },
+            tabBarIcon: ({ color, focused }) => {
+              if (route.name === 'Home')    return <Feather name="home" size={20} color={color} />;
+              if (route.name === 'Reports') return <Feather name="list" size={20} color={color} />;
+              if (route.name === 'About')   return <Feather name="info" size={20} color={color} />;
+              if (route.name === 'Heatmap') return (
+                <MaterialCommunityIcons
+                  name={focused ? 'map-marker-radius' : 'map-marker-radius-outline'}
+                  size={22}
+                  color={color}
+                />
+              );
+            },
+          })}
+        >
+          <Tab.Screen name="Home"    component={MainStack}        options={{ title: 'Home' }} />
+          <Tab.Screen
+            name="Reports"
+            component={ReportsListScreen}
+            options={{
+              title: 'Reports',
+              headerShown: true,
+              ...BASE_HEADER,
+              headerTitle: 'Reports',
+            }}
+          />
+          {/* Phase 4: Heatmap tab */}
+          <Tab.Screen
+            name="Heatmap"
+            component={HeatmapScreen}
+            options={{
+              title: 'Heatmap',
+              headerShown: false,
+              ...BASE_HEADER,
+              headerTitle: 'Heatmap',
+            }}
+          />
+          <Tab.Screen
+            name="About"
+            component={AboutScreen}
+            options={{
+              title: 'About',
+              headerShown: true,
+              ...BASE_HEADER,
+              headerTitle: 'About & How to Use',
+            }}
+          />
+        </Tab.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

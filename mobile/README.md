@@ -1,4 +1,4 @@
-# RoadWatch — Mobile App
+# StreetIntel — Mobile App
 
 React Native (Expo) mobile app for the AI Road Inspection System.
 

@@ -47,7 +47,8 @@ function computeQualityScore(aiResult, gpsAccuracy = null) {
   const dangerPenalty = DANGER_PENALTY[aiResult.danger_level] ?? 0;
 
   // Confidence multiplier — uncertain detections penalise less
-  const confidence      = aiResult.confidence ?? 0;
+  // Minimum penalty multiplier of 0.2 ensures even low-confidence hits impact the score
+  const confidence      = Math.max(0.2, aiResult.confidence ?? 0);
   const weightedDanger  = dangerPenalty * confidence;
 
   // ── 2. Size penalty (bbox area relative to assumed 640×640 image) ────
@@ -55,13 +56,12 @@ function computeQualityScore(aiResult, gpsAccuracy = null) {
   if (aiResult.bbox && Array.isArray(aiResult.bbox) && aiResult.bbox.length === 4) {
     const [x1, y1, x2, y2] = aiResult.bbox;
     const bboxArea  = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
-    const imgArea   = 640 * 640; // YOLO default inference size
+    const imgArea   = 640 * 640; 
     const areaRatio = bboxArea / imgArea;
 
-    if (areaRatio > 0.08)       sizePenalty = -1.5; // large pothole
-    else if (areaRatio > 0.03)  sizePenalty = -0.8; // medium
-    else if (areaRatio > 0)     sizePenalty = -0.3; // small
-    // no detection → 0
+    if (areaRatio > 0.08)       sizePenalty = -1.5; 
+    else if (areaRatio > 0.03)  sizePenalty = -0.8; 
+    else if (areaRatio > 0)     sizePenalty = -0.3; 
   }
 
   // ── 3. GPS accuracy penalty ───────────────────────────────────────────
@@ -72,7 +72,14 @@ function computeQualityScore(aiResult, gpsAccuracy = null) {
   }
 
   const raw = 10 + weightedDanger + sizePenalty + gpsPenalty;
-  return Math.round(Math.min(10, Math.max(0, raw)) * 100) / 100;
+  
+  // Final safeguard: if a defect type exists, score must be below 9.5
+  let score = Math.min(10, Math.max(0, raw));
+  if (aiResult.defect_type && score > 9.5) {
+    score = 9.45;
+  }
+
+  return Math.round(score * 100) / 100;
 }
 
 // ── POST /api/report ─────────────────────────────────────────────────────────

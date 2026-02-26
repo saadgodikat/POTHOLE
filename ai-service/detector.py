@@ -16,7 +16,7 @@ HF_REPO     = os.getenv("HF_REPO", "Harisanth/Pothole-Finetuned-YOLOv8")
 HF_FILENAME = os.getenv("HF_FILENAME", "best.pt")
 MODEL_PATH  = os.getenv("MODEL_PATH", "")  # If set, overrides everything
 
-CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.30"))
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.15"))
 
 # ── Three-level danger classification ─────────────────────────────────────────
 # Potholes are classified into 3 danger levels based on confidence + bbox area:

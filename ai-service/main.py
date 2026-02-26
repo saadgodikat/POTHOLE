@@ -116,7 +116,7 @@ async def detect_defect(file: UploadFile = File(...)):
 
         result = detect(image_bytes)
 
-        threshold = float(os.getenv("CONFIDENCE_THRESHOLD", "0.30"))
+        threshold = float(os.getenv("CONFIDENCE_THRESHOLD", "0.15"))
         result["is_valid"] = result["confidence"] >= threshold
 
         return result

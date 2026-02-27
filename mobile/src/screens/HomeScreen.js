@@ -28,11 +28,6 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.appName}>StreetIntel</Text>
           <Text style={styles.tagline}>AI-Powered Road Inspection Platform</Text>
 
-          {/* Pill tag */}
-          <View style={styles.pill}>
-            <View style={styles.pillDot} />
-            <Text style={styles.pillText}>Live · Phase 1 + 2 MVP</Text>
-          </View>
         </View>
 
         {/* ── Stats row ── */}
@@ -86,23 +81,6 @@ export default function HomeScreen({ navigation }) {
           <Feather name="chevron-right" size={20} color={COLORS.textMuted} />
         </TouchableOpacity>
 
-        {/* ── Info cards ── */}
-        <Text style={styles.sectionHead}>How it works</Text>
-        <View style={styles.infoGrid}>
-          {[
-            { icon: 'camera',  step: '01', title: 'Capture',  desc: 'Take a photo of the road defect' },
-            { icon: 'map-pin', step: '02', title: 'Tag GPS',  desc: 'Coordinates are auto-attached'  },
-            { icon: 'upload',  step: '03', title: 'Submit',   desc: 'Report is sent to the server'   },
-            { icon: 'cpu',     step: '04', title: 'AI Scan',  desc: 'YOLOv8 detects defect type'     },
-          ].map((c, i) => (
-            <View key={i} style={styles.infoCard}>
-              <Text style={styles.infoStep}>{c.step}</Text>
-              <Feather name={c.icon} size={20} color={COLORS.primary} style={{ marginBottom: 8 }} />
-              <Text style={styles.infoTitle}>{c.title}</Text>
-              <Text style={styles.infoDesc}>{c.desc}</Text>
-            </View>
-          ))}
-        </View>
 
       </ScrollView>
     </View>

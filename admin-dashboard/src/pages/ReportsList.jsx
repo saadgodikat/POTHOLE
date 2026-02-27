@@ -4,6 +4,7 @@ import { UserPlus, CheckCircle, MoreVertical, ExternalLink } from 'lucide-react'
 
 const ReportsList = ({ category }) => {
   const [reports, setReports] = useState([]);
+  const [technicians, setTechnicians] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedReport, setSelectedReport] = useState(null);
   const [technicianName, setTechnicianName] = useState('');
@@ -13,8 +14,12 @@ const ReportsList = ({ category }) => {
     try {
       const res = await axios.get('http://localhost:3000/api/admin/reports');
       setReports(res.data[category] || []);
+      
+      // Also fetch technicians for the dropdown
+      const techRes = await axios.get('http://localhost:3000/api/admin/technicians');
+      setTechnicians(techRes.data);
     } catch (err) {
-      console.error('Error fetching reports', err);
+      console.error('Error fetching data', err);
     } finally {
       setLoading(false);
     }
@@ -63,6 +68,7 @@ const ReportsList = ({ category }) => {
         <table className="report-table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Image</th>
               <th>Defect Type</th>
               <th>Location</th>
@@ -74,12 +80,30 @@ const ReportsList = ({ category }) => {
           <tbody>
             {reports.map((report) => (
               <tr key={report.report_id} className="report-row glass-card">
+                <td style={{ fontSize: '0.8rem', fontWeight: 'bold', color: 'var(--accent-cyan)' }}>
+                  #{report.report_id}
+                </td>
                 <td>
-                  <img 
-                    src={`http://localhost:3000${report.image_url}`} 
-                    alt="defect" 
-                    style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} 
-                  />
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <img 
+                        src={`http://localhost:3000${report.image_url}`} 
+                        alt="defect" 
+                        style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} 
+                      />
+                      <div style={{ fontSize: '0.5rem', opacity: 0.5 }}>BEFORE</div>
+                    </div>
+                    {report.completion_image && (
+                      <div style={{ textAlign: 'center' }}>
+                        <img 
+                          src={`http://localhost:3000${report.completion_image}`} 
+                          alt="completed" 
+                          style={{ width: '60px', height: '40px', objectFit: 'cover', borderRadius: '4px', border: '1px solid var(--accent-green)' }} 
+                        />
+                        <div style={{ fontSize: '0.5rem', color: 'var(--accent-green)' }}>AFTER</div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td>
                   <div style={{ fontWeight: '600' }}>{report.defect_type}</div>
@@ -103,9 +127,16 @@ const ReportsList = ({ category }) => {
                 </td>
                 <td>
                   {report.assigned_to ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <CheckCircle size={14} color="var(--accent-green)" />
-                      <span style={{ fontSize: '0.9rem' }}>{report.assigned_to}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <CheckCircle size={14} color="var(--accent-green)" />
+                        <span style={{ fontSize: '0.9rem' }}>{report.assigned_to}</span>
+                      </div>
+                      {report.completion_notes && (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: '150px', fontStyle: 'italic' }}>
+                          "{report.completion_notes}"
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <button onClick={() => setSelectedReport(report)} className="btn-primary" style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}>
@@ -115,7 +146,7 @@ const ReportsList = ({ category }) => {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {category !== 'paused' && (
+                    {report.status !== 'paused' && report.status !== 'green' && (
                       <button onClick={() => updateStatus(report.report_id, 'paused')} style={{ background: 'rgba(15, 188, 249, 0.1)', color: 'var(--accent-cyan)' }}>
                         Pause
                       </button>
@@ -142,16 +173,30 @@ const ReportsList = ({ category }) => {
             </p>
             
             <label style={{ fontSize: '0.8rem', fontWeight: '500' }}>Technician / Team Name</label>
-            <input 
-              type="text" 
-              placeholder="e.g. John Doe or Team Alpha" 
+            <select 
               value={technicianName}
               onChange={(e) => setTechnicianName(e.target.value)}
-              autoFocus
-            />
+              style={{
+                width: '100%',
+                padding: '0.8rem',
+                background: '#f8f9fa',
+                border: '1px solid #ced4da',
+                borderRadius: '8px',
+                color: '#333',
+                marginTop: '0.5rem',
+                fontSize: '0.9rem'
+              }}
+            >
+              <option value="">Select a Technician...</option>
+              {technicians.map(tech => (
+                <option key={tech.id} value={tech.name}>
+                  {tech.name} ({tech.specialty})
+                </option>
+              ))}
+            </select>
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-              <button onClick={() => setSelectedReport(null)} style={{ flex: 1, background: 'rgba(255, 255, 255, 0.1)', color: 'white' }}>
+              <button onClick={() => { setSelectedReport(null); setTechnicianName(''); }} style={{ flex: 1, background: 'rgba(255, 255, 255, 0.1)', color: 'white' }}>
                 Cancel
               </button>
               <button onClick={handleAssign} className="btn-primary" style={{ flex: 1 }}>

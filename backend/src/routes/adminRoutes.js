@@ -10,19 +10,23 @@ router.get('/reports', (req, res) => {
   try {
     const db = getDb();
     
-    // Emergency: danger_level = 'critical'
-    const emergency = db.prepare("SELECT * FROM reports WHERE danger_level = 'critical' AND status != 'paused' ORDER BY created_at DESC").all();
+    // Emergency: danger_level = 'critical', excluding paused and completed
+    const emergency = db.prepare("SELECT * FROM reports WHERE danger_level = 'critical' AND status NOT IN ('paused', 'green') ORDER BY created_at DESC").all();
     
-    // Moderate: danger_level = 'moderate'
-    const moderate = db.prepare("SELECT * FROM reports WHERE danger_level = 'moderate' AND status != 'paused' ORDER BY created_at DESC").all();
+    // Moderate: danger_level = 'moderate', excluding paused and completed
+    const moderate = db.prepare("SELECT * FROM reports WHERE danger_level = 'moderate' AND status NOT IN ('paused', 'green') ORDER BY created_at DESC").all();
     
     // Paused: status = 'paused'
     const paused = db.prepare("SELECT * FROM reports WHERE status = 'paused' ORDER BY created_at DESC").all();
+
+    // Completed: status = 'green'
+    const completed = db.prepare("SELECT * FROM reports WHERE status = 'green' ORDER BY created_at DESC").all();
     
     res.json({
       emergency,
       moderate,
-      paused
+      paused,
+      completed
     });
   } catch (err) {
     console.error('[GET /admin/reports]', err);
@@ -91,6 +95,37 @@ router.patch('/reports/:id/status', (req, res) => {
     res.json({ message: 'Status updated successfully', report: updated });
   } catch (err) {
     console.error('[PATCH /admin/reports/:id/status]', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/technicians
+ * List all technicians.
+ */
+router.get('/technicians', (req, res) => {
+  try {
+    const db = getDb();
+    const technicians = db.prepare('SELECT * FROM technicians ORDER BY name ASC').all();
+    res.json(technicians);
+  } catch (err) {
+    console.error('[GET /admin/technicians]', err);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/technicians/:name/history
+ * Get work history for a specific technician.
+ */
+router.get('/technicians/:name/history', (req, res) => {
+  try {
+    const { name } = req.params;
+    const db = getDb();
+    const history = db.prepare('SELECT * FROM reports WHERE assigned_to = ? ORDER BY assigned_date DESC').all(name);
+    res.json(history);
+  } catch (err) {
+    console.error('[GET /admin/technicians/:name/history]', err);
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
 });

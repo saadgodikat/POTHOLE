@@ -18,7 +18,7 @@ const DashboardHome = () => {
           emergency: res.data.emergency.length,
           moderate: res.data.moderate.length,
           paused: res.data.paused.length,
-          completed: 0 // Will implement full stats later
+          completed: res.data.completed.length
         });
       } catch (err) {
         console.error('Error fetching stats', err);

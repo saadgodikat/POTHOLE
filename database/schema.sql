@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS reports (
   -- paused  = work stopped/paused
   assigned_to     TEXT,
   assigned_date   DATETIME,
+  completion_image TEXT,
+  completion_notes TEXT,
+  completed_at     DATETIME,
   created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -58,3 +61,16 @@ CREATE INDEX IF NOT EXISTS idx_reports_user_id       ON reports(user_id);
 CREATE INDEX IF NOT EXISTS idx_reports_timestamp     ON reports(timestamp);
 CREATE INDEX IF NOT EXISTS idx_reports_lat_lng       ON reports(latitude, longitude);  -- Phase 3: heatmap spatial queries
 CREATE INDEX IF NOT EXISTS idx_reports_quality_score ON reports(quality_score);        -- Phase 3: quality-based filtering
+
+-- ─────────────────────────────────────────────
+-- Table: technicians
+-- ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS technicians (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  name        TEXT    NOT NULL UNIQUE,
+  specialty   TEXT,
+  phone       TEXT,
+  passcode    TEXT    NOT NULL DEFAULT '1234',
+  status      TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+  created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+);

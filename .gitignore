@@ -52,6 +52,10 @@ kaggle.json
 .DS_Store
 Thumbs.db
 
+# Project Specific
+data/
+backend/uploads/
+
 # IDE
 .vscode/
 .idea/

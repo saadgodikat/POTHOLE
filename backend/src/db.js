@@ -62,7 +62,48 @@ function getDb() {
       // Admin Side: Assignment & Status
       addIfMissing('assigned_to',     'TEXT');
       addIfMissing('assigned_date',   'DATETIME');
+      addIfMissing('completion_image', 'TEXT');
+      addIfMissing('completion_notes', 'TEXT');
+      addIfMissing('completed_at',     'DATETIME');
+
+      // Update technicians table if it already exists
+      const techCols = () => db.prepare('PRAGMA table_info(technicians)').all().map((r) => r.name);
+      const techTableExists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='technicians'").get();
+      if (techTableExists) {
+        const tCols = techCols();
+        if (!tCols.includes('passcode')) {
+          db.prepare("ALTER TABLE technicians ADD COLUMN passcode TEXT DEFAULT '1234'").run();
+          console.log("[DB] Migration: added column 'passcode' to technicians");
+        }
+      }
     }
+
+    // ── Step 1.5: Ensure technicians table exists ──────────────────────
+    db.prepare(`
+        CREATE TABLE IF NOT EXISTS technicians (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          name        TEXT    NOT NULL UNIQUE,
+          specialty   TEXT,
+          phone       TEXT,
+          passcode    TEXT    NOT NULL DEFAULT '1234',
+          status      TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+          created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `).run();
+
+      // Seed technicians if empty
+      const techCount = db.prepare('SELECT COUNT(*) as count FROM technicians').get().count;
+      if (techCount === 0) {
+        console.log('[DB] Seeding default technicians...');
+        const seedTechs = [
+          ['Rajesh Kumar', 'Pothole Specialist', '+91 98765 43210', '1234'],
+          ['Amit Patel', 'Surface Damage Expert', '+91 98234 56789', '1234'],
+          ['Suresh Raina', 'Emergency Response', '+91 91234 56780', '1234'],
+          ['Vikram Singh', 'Road Maintenance', '+91 88776 65544', '1234']
+        ];
+        const insert = db.prepare('INSERT INTO technicians (name, specialty, phone, passcode) VALUES (?, ?, ?, ?)');
+        seedTechs.forEach(tech => insert.run(...tech));
+      }
 
     // ── Step 2: Run schema.sql (safe now — all columns exist) ────────────
     if (fs.existsSync(SCHEMA_PATH)) {

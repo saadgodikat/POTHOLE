@@ -190,22 +190,31 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.get('/', (req, res) => {
   try {
     const db = getDb();
-    const { status, limit = 50, offset = 0 } = req.query;
+    const { status, assigned_to, limit = 50, offset = 0 } = req.query;
 
     let query  = 'SELECT * FROM reports';
     const params = [];
+    const conditions = [];
 
     if (status) {
-      query += ' WHERE status = ?';
+      conditions.push('status = ?');
       params.push(status);
     }
+    if (assigned_to) {
+      conditions.push('assigned_to = ?');
+      params.push(assigned_to);
+    }
+
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(parseInt(limit), parseInt(offset));
 
     const reports = db.prepare(query).all(...params);
-    const total   = db
-      .prepare(`SELECT COUNT(*) as count FROM reports${status ? ' WHERE status = ?' : ''}`)
-      .get(...(status ? [status] : []));
+    const totalQuery = `SELECT COUNT(*) as count FROM reports${conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : ''}`;
+    const total   = db.prepare(totalQuery).get(...params.slice(0, -2));
 
     return res.json({ total: total.count, limit: parseInt(limit), offset: parseInt(offset), reports });
   } catch (err) {
@@ -456,6 +465,47 @@ router.patch('/:id', (req, res) => {
   } catch (err) {
     console.error('[DB ERROR]', err);
     res.status(500).json({ error: 'Failed to update report' });
+  }
+});
+
+/**
+ * POST /api/reports/:id/validate
+ * Technician validation: mark work as done with proof.
+ * Body (multipart/form-data):
+ *   image — completion proof image
+ *   notes — completion notes
+ */
+router.post('/:id/validate', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Completion proof image is required' });
+    }
+
+    const db = getDb();
+    const completionImageUrl = `/uploads/${req.file.filename}`;
+    const completedAt = new Date().toISOString();
+
+    const result = db.prepare(`
+      UPDATE reports 
+      SET status = 'green',
+          completion_image = ?,
+          completion_notes = ?,
+          completed_at = ?
+      WHERE report_id = ?
+    `).run(completionImageUrl, notes || null, completedAt, id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+
+    const updated = db.prepare('SELECT * FROM reports WHERE report_id = ?').get(id);
+    res.json({ message: 'Work validated successfully', report: updated });
+  } catch (err) {
+    console.error('[POST /reports/:id/validate]', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
